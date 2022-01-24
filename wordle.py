@@ -1,8 +1,13 @@
-from traceback import print_tb
+import matplotlib as mpl
 import pandas as pd
 import numpy as np
 import random
 import warnings
+import matplotlib.animation as animation
+import matplotlib.pyplot as plt
+mpl.rcParams['animation.ffmpeg_path'] = r'C:\\Users\\xx\\Desktop\\ffmpeg\\bin\\ffmpeg.exe'
+# import seaborn as sns
+# %matplotlib qt
 
 with warnings.catch_warnings():
     warnings.simplefilter("ignore")
@@ -12,17 +17,16 @@ class Wordle:
     def __init__(self):
         self.word = None
         self.player_words = []
-        self.data = pd.read_csv('words_def.csv')
+        self.data_aux = pd.read_csv('words_def.csv')
+        self.data = self.data_aux.copy()
         self.ronda = 0
         self.total_words = len(self.data)
         self.win = False
-        self.results = []
+        self.results = {}
     
 
     def play(self):
         index = random.randint(0, self.total_words)
-        self.word = self.data.iloc[index]['words']
-        print(self.word)
         
         while self.ronda < 5 and self.win==False:
             self.player_round()
@@ -46,24 +50,31 @@ class Wordle:
         self.player_words.append(pal)
 
     def check(self):
-        result = {}
+        result = []
         # print(self.player_words)
         if self.player_words[self.ronda] == self.word:
-            self.win = True   
+            self.win = True
         else:
             i = 0
             for let in self.player_words[self.ronda]:
                 pos = self.word.find(let)
-                if pos == i:
-                    result[let] = 2
-                elif pos>=0 and pos!=i:
-                    result[let] = 1
+                if pos < 0:
+                    result.append([let, 0])
                 else:
-                    result[let] = 0
+                    if let == self.word[i]:
+                        result.append([let, 2])
+                    else:
+                        result.append([let, 1])
                 i += 1
-            print(result)
-        self.results.append(result)
+        self.results[self.ronda] = result
 
+    def play_again_test(self):
+        self.win = False
+        # self.word = 'None'
+        self.player_words = []
+        self.ronda = 0
+        self.results = {}
+        # self.play()
 
     def play_again(self):
         resp = input('Vols tornar a jugar (s/n): ')
@@ -79,55 +90,47 @@ class Wordle_Solver:
     def __init__(self):
         self.wordle = Wordle()
         self.data = pd.read_csv('words_def.csv')
+        self.position = []
+
+    def solve(self, n):
         self.data_aux = self.data.copy()
+        self.word_try = []
+        self.position = []
         self.let_in = ''
         self.let_not_in = ''
-        self.position = {}
-        self.word_try = []
-
-    def solve(self):
-        index = random.randint(0, len(self.data))
-        # self.wordle.word = self.wordle.data.iloc[index]['words']
-        self.wordle.word = 'parel'
-        print(self.wordle.word)
-        while self.wordle.win == False and self.wordle.ronda < 6:
+        # index = random.randint(0, len(self.data))
+        self.wordle.word = self.wordle.data.iloc[n]['words']
+        while self.wordle.ronda < 6:
             self.chose_word()
             self.wordle.player_words = self.word_try
             self.wordle.check()
-            print("Ronda {}: {}".format(self.wordle.ronda, self.word_try[self.wordle.ronda]))
+            if self.wordle.win == True:
+                break
+            # print("Ronda {}: {}".format(self.wordle.ronda, self.word_try[self.wordle.ronda]))
             acc = self.wordle.results[self.wordle.ronda]
-            print('Resultat: {}'.format(acc))
+            # print('Resultat: {}'.format(acc))
             i = 0
-            for let in acc.keys():
-                if acc[let] == 0:
-                    self.let_not_in += let
-                elif acc[let] == 1 or acc[let] == 2:
-                    self.let_in += let
-                if acc[let] == 2:
-                    self.position[let] = i
+            for i in range(5):
+                if acc[i][1] == 0:
+                    self.let_not_in += acc[i][0]
+                elif acc[i][0] == 1 or acc[i][1] == 2:
+                    self.let_in += acc[i][0]
+                if acc[i][1] == 2:
+                    self.position.append([acc[i][0], i])
                 i += 1
             self.let_not_in = ''.join(set(self.let_not_in))
             self.let_in = ''.join(set(self.let_in))
-            print(self.position)
-            print(self.let_in)
-            print(self.let_not_in)
-
             self.wordle.ronda += 1
 
-        if self.wordle.win == True:
-            print("Has guanyaaaat!")
-        else:
-            print("Has perdut, eres un puto loser")
+        # if self.wordle.win == True:
+        #     print("Has guanyaaaat!")
+        # else:
+        #     print("Has perdut, eres un puto loser")
 
     def chose_word(self):
         if self.wordle.ronda != 0:
             self.refresh_data()
-            print(self.word_try)
-            print(self.data_aux.iloc[0]['words'])
-            # if self.data_aux.iloc[0]['words'] == self.word_try[self.wordle.ronda-1]:
-            #     self.data_aux = self.data_aux.iloc[1: , :]
-
-        print('Paraules restants: {}'.format(self.data_aux.shape[0]))
+        # print(self.data_aux.shape)
         self.word_try.append(self.data_aux.iloc[0]['words'])
 
     
@@ -135,44 +138,113 @@ class Wordle_Solver:
         if len(self.let_in) != 0:
             self.data_aux['cond'] = self.data_aux['words'].apply(lambda x: 0 not in [c in x for c in self.let_in])
             self.data_aux.drop(self.data_aux[self.data_aux['cond'] == False].index, inplace=True)
-            print('='*10, '  let_in: ', self.wordle.ronda)
-            print(self.wordle.word in self.data_aux['words'].values)
-
+            # print(self.wordle.word in self.data_aux['words'].values)
         if len(self.let_not_in) != 0:
             self.data_aux['cond'] = self.data_aux['words'].apply(lambda x: 1 not in [c in x for c in self.let_not_in])
             self.data_aux.drop(self.data_aux[self.data_aux['cond'] == False].index, inplace=True)
-            print('='*10, '  let_not_in: ', self.wordle.ronda)
-            print(self.wordle.word in self.data_aux['words'].values)
+            # print(self.wordle.word in self.data_aux['words'].values)
 
-        if len(self.position.keys()) != 0:
-            for let in list(self.position.keys()):
-                pos = self.position
-                for i in range(len(self.data_aux)):
-                    # print(self.data_aux.loc[i]['words'])
-                    self.data_aux.iloc[i]['cond'] = self.check_positions(self.data_aux.iloc[i]['words'], self.position, let)
+        if len(self.position) != 0:
+            for i in range(len(self.position)):
+                pos = self.position[i][1]
+                let = self.position[i][0]
+                self.data_aux['cond'] = self.data_aux['words'].apply(lambda x: self.check_positions(x, pos, let))
                 self.data_aux.drop(self.data_aux[self.data_aux['cond'] == False].index, inplace=True)
-                print('='*10, '  dict: ', self.wordle.ronda)
-                print(self.wordle.word in self.data_aux['words'].values)
-                print(self.position)
-        print(self.data_aux.head()) # [self.data_aux['words']==self.wordle.word]
-        print(self.wordle.word in self.data_aux['words'].values)
+            # print(self.position)
+            # print(self.wordle.word in self.data_aux['words'].values)
 
+    
     def check_positions(self, name, pos, let):
         pos_aux = pos
         a = True
         while a:
-            if name.find(let) == pos_aux[let]:
+            if name.find(let) == pos_aux:
                 a = False
                 return True
             else:
-                pos_aux[let] -= name.find(let)+1
+                pos_aux -= name.find(let)+1
                 name = name[name.find(let)+1:]
                 if name.find(let) < 0:
                     a = False
                     return False
 
+class Wordle_Metrics:
+    def __init__(self, mode='total', N=100):
+        self.solver = Wordle_Solver()
+        self.hist = pd.DataFrame(data={'1': [0], '2': [0], '3': [0], '4': [0], '5': [0], '6': [0], 'Fail': [0]})
+        self.N = N
+        self.mode = mode
+    
+    def chose_model(self):
+        if self.mode == 'total':
+            self.N = len(self.solver.data)
+        elif self.mode == 'random':
+            n = self.N
+        for i in range(n):
+            self.play(i)
+        # print(self.hist.head())
+        # print(self.hist.sum())
+    
+    def play(self, i):
+        if self.mode == 'total':
+            self.solver.solve(random.randint(0, self.N))
+        elif self.mode == 'random':
+            self.solver.solve(i)
+        if self.solver.wordle.win:
+            col = str(self.solver.wordle.ronda + 1)
+            self.hist.loc[0, col] += 1
+        else:
+            self.hist.loc[0, 'Fail'] += 1
+        self.solver.wordle.play_again_test()
+
+    
+    def draw_results(self):
+        def anim(i):
+            if self.mode == 'total':
+                self.solver.solve(random.randint(0, self.N))
+            elif self.mode == 'random':
+                self.solver.solve(i)
+            if self.solver.wordle.win:
+                col = str(self.solver.wordle.ronda + 1)
+                self.hist.loc[0, col] += 1
+            else:
+                self.hist.loc[0, 'Fail'] += 1
+            self.solver.wordle.play_again_test()
+            im = plt.bar(self.hist.columns, self.hist.loc[0].values, color = 'b')
+            return im 
+
+        fig = plt.figure(figsize=(8,6))
+        axes = fig.add_subplot(1,1,1)
+        axes.set_ylim(0, 150)
+        # plt.style.use("seaborn")
+        plt.title("Wordle", color=("blue"))
+        ani = animation.FuncAnimation(fig, anim, frames=self.N, blit = True)
+        plt.show()
+        writergif = animation.FFMpegWriter(fps=60)  
+        ani.save('prova.mp4', writer=writergif)
+
 
 if __name__ == '__main__':
-    wordle = Wordle_Solver()
-    wordle.solve()
+    a = input('Mode: ')
+    # a = 'a'
+    if a == 'test':
+        wordle = Wordle()
+        wordle.play()
+    elif a == 'go':
+        b = input('total/random: ')
+        if b == 'total':
+            test = Wordle_Metrics()
+            test.play()
+        elif b == 'random':
+            num = int(input('Mostres: '))
+            test = Wordle_Metrics(b, num)
+            test.chose_model()
+    elif a == 'polla':
+        wordle = Wordle_Solver()
+        wordle.solve()
+    elif a == 'draw':
+        wordle = Wordle_Metrics('random', 10)
+        wordle.draw_results()
+    else:
+        pass
         
