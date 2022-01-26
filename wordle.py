@@ -5,7 +5,7 @@ import random
 import warnings
 import matplotlib.animation as animation
 import matplotlib.pyplot as plt
-mpl.rcParams['animation.ffmpeg_path'] = r'C:\\Users\\xx\\Desktop\\ffmpeg\\bin\\ffmpeg.exe'
+# mpl.rcParams['animation.ffmpeg_path'] = r'C:\\Users\\xx\\Desktop\\ffmpeg\\bin\\ffmpeg.exe'
 # import seaborn as sns
 # %matplotlib qt
 
@@ -171,57 +171,76 @@ class Wordle_Solver:
 class Wordle_Metrics:
     def __init__(self, mode='total', N=100):
         self.solver = Wordle_Solver()
-        self.hist = pd.DataFrame(data={'1': [0], '2': [0], '3': [0], '4': [0], '5': [0], '6': [0], 'Fail': [0]})
+        self.hist = pd.DataFrame(columns=['1', '2', '3', '4', '5', '6', 'Fail'])
         self.N = N
         self.mode = mode
     
     def chose_model(self):
         if self.mode == 'total':
             self.N = len(self.solver.data)
+            n = self.N
         elif self.mode == 'random':
             n = self.N
         for i in range(n):
+            # print(i)
+            # print(self.hist.tail())
             self.play(i)
         # print(self.hist.head())
         # print(self.hist.sum())
     
     def play(self, i):
+        # print(i, 'holae')
         if self.mode == 'total':
-            self.solver.solve(random.randint(0, self.N))
+            self.solver.solve(i)
         elif self.mode == 'random':
             self.solver.solve(i)
         if self.solver.wordle.win:
-            col = str(self.solver.wordle.ronda + 1)
-            self.hist.loc[0, col] += 1
+            if self.hist.empty:
+                col = str(self.solver.wordle.ronda + 1)
+                self.hist.loc[0] = 0
+                self.hist.loc[0, col] += 1
+            else:
+                col = str(self.solver.wordle.ronda + 1)
+                self.hist.loc[i] = self.hist.loc[i-1]
+                self.hist.loc[i, col] = self.hist.loc[i-1, col] + 1
         else:
-            self.hist.loc[0, 'Fail'] += 1
+            if self.hist.empty:
+                self.hist.loc[0] = 0
+                self.hist.loc[0, 'Fail'] += 1
+            else:
+                self.hist.loc[i] = self.hist.loc[i-1]
+                self.hist.loc[i, 'Fail'] = self.hist.loc[i-1, 'Fail'] + 1
         self.solver.wordle.play_again_test()
 
     
     def draw_results(self):
         def anim(i):
-            if self.mode == 'total':
-                self.solver.solve(random.randint(0, self.N))
-            elif self.mode == 'random':
-                self.solver.solve(i)
-            if self.solver.wordle.win:
-                col = str(self.solver.wordle.ronda + 1)
-                self.hist.loc[0, col] += 1
-            else:
-                self.hist.loc[0, 'Fail'] += 1
-            self.solver.wordle.play_again_test()
-            im = plt.bar(self.hist.columns, self.hist.loc[0].values, color = 'b')
+            # if self.mode == 'total':
+            #     self.solver.solve(random.randint(0, self.N))
+            # elif self.mode == 'random':
+            #     self.solver.solve(i)
+            # if self.solver.wordle.win:
+            #     col = str(self.solver.wordle.ronda + 1)
+            #     self.hist.loc[0, col] += 1
+            # else:
+            #     self.hist.loc[0, 'Fail'] += 1
+            # self.solver.wordle.play_again_test()
+            # print(i, 'animacio')
+            # print(self.hist.head())
+            colors = ['blue', 'blue', 'blue', 'blue', 'blue', 'blue', 'red']
+            im = plt.bar(self.hist.columns, self.hist.loc[i].values, color = colors)
             return im 
-
+        print(self.hist.tail())
         fig = plt.figure(figsize=(8,6))
         axes = fig.add_subplot(1,1,1)
-        axes.set_ylim(0, 150)
-        # plt.style.use("seaborn")
-        plt.title("Wordle", color=("blue"))
-        ani = animation.FuncAnimation(fig, anim, frames=self.N, blit = True)
+        axes.set_ylim(0, 1290)
+        plt.title("Wordle", color=("black"))
+        ani = animation.FuncAnimation(fig=fig, frames=self.N, repeat = False, func=anim, blit = True)
         plt.show()
-        writergif = animation.FFMpegWriter(fps=60)  
-        ani.save('prova.mp4', writer=writergif)
+        Writer = animation.writers['ffmpeg']
+        writer = Writer(fps=5, metadata=dict(artist='Me'))
+        # writergif = animation.FFMpegWriter(fps=60)  
+        # ani.save('prova.mp4', writer=writer)
 
 
 if __name__ == '__main__':
@@ -236,14 +255,16 @@ if __name__ == '__main__':
             test = Wordle_Metrics()
             test.play()
         elif b == 'random':
-            num = int(input('Mostres: '))
+            # num = int(input('Mostres: '))
+            num = 10
             test = Wordle_Metrics(b, num)
             test.chose_model()
     elif a == 'polla':
         wordle = Wordle_Solver()
         wordle.solve()
     elif a == 'draw':
-        wordle = Wordle_Metrics('random', 10)
+        wordle = Wordle_Metrics('total')
+        wordle.chose_model()
         wordle.draw_results()
     else:
         pass
